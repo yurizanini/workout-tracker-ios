@@ -15,15 +15,19 @@ enum AppTheme {
     static let focus = Color(red: 0.36, green: 0.55, blue: 1.0)      // Blue focus
     static let recovery = Color(red: 0.55, green: 0.45, blue: 0.85)  // Purple recovery
 
-    // Neutral tones
+    // Neutral tones — adapt to light/dark mode
     static let cardBackground = Color(.systemBackground)
     static let elevatedBackground = Color(.secondarySystemBackground)
-    static let screenBackground = Color(red: 0.96, green: 0.96, blue: 0.98)
+    static let screenBackground = Color(.secondarySystemBackground)
 
-    // Text
+    // Text — always use system-adaptive colors
     static let textPrimary = Color(.label)
     static let textSecondary = Color(.secondaryLabel)
     static let textTertiary = Color(.tertiaryLabel)
+
+    // Fixed light-on-dark text (for gradient cards where background is always dark/colored)
+    static let textOnAccent = Color.white
+    static let textOnAccentSecondary = Color.white.opacity(0.8)
 
     // Gradients
     static let primaryGradient = LinearGradient(
