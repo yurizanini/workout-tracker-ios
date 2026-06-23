@@ -54,6 +54,10 @@ class WorkoutViewModel: ObservableObject {
         return formatter.string(from: monday)
     }
 
+    var sortedWeekKeys: [String] {
+        logs.keys.sorted().reversed()
+    }
+
     // MARK: - Init
 
     init() {
@@ -114,6 +118,10 @@ class WorkoutViewModel: ObservableObject {
 
     func updateSchedule(dayIndex: Int, workout: WorkoutDay) {
         schedule[dayIndex] = workout
+    }
+
+    func updateSchedule(dayIndex: Int, workoutDay: WorkoutDay) {
+        schedule[dayIndex] = workoutDay
     }
 
     func resetSchedule() {

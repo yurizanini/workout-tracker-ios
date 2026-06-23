@@ -17,6 +17,7 @@
 		A1000008 /* ScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000008 /* ScheduleView.swift */; };
 		A1000009 /* ProgressView2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000009 /* ProgressView2.swift */; };
 		A1000010 /* CompletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000010 /* CompletionView.swift */; };
+		A1000011 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000011 /* Theme.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 		A2000008 /* ScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleView.swift; sourceTree = "<group>"; };
 		A2000009 /* ProgressView2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressView2.swift; sourceTree = "<group>"; };
 		A2000010 /* CompletionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionView.swift; sourceTree = "<group>"; };
+		A2000011 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		A3000001 /* WorkoutTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WorkoutTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -60,9 +62,18 @@
 				A5000003 /* Models */,
 				A5000004 /* ViewModels */,
 				A5000005 /* Views */,
+				A5000007 /* Utils */,
 				A2000003 /* Assets.xcassets */,
 			);
 			path = WorkoutTracker;
+			sourceTree = "<group>";
+		};
+		A5000007 /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				A2000011 /* Theme.swift */,
+			);
+			path = Utils;
 			sourceTree = "<group>";
 		};
 		A5000003 /* Models */ = {
@@ -179,6 +190,7 @@
 				A1000008 /* ScheduleView.swift in Sources */,
 				A1000009 /* ProgressView2.swift in Sources */,
 				A1000010 /* CompletionView.swift in Sources */,
+				A1000011 /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

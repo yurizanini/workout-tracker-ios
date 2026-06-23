@@ -17,34 +17,36 @@ struct WorkoutSessionView: View {
         for (i, block) in workout.blocks.enumerated() {
             result.append((block.name, .block(i)))
         }
-        for (i, acc) in workout.accessories.enumerated() {
-            result.append((acc.name, .accessory(i)))
+        for (i, _) in workout.accessories.enumerated() {
+            result.append((workout.accessories[i].name, .accessory(i)))
         }
         return result
+    }
+
+    private var progress: Double {
+        guard !sections.isEmpty else { return 0 }
+        return Double(activeSectionIndex + 1) / Double(sections.count)
     }
 
     var body: some View {
         if let workout = workout {
             VStack(spacing: 0) {
-                // Header
                 sessionHeader
-
-                // Section tabs
+                progressBar
                 sectionTabs
 
-                // Content
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        sectionTitle
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: AppTheme.spacingLG) {
+                        sectionHeader
                         sectionContent(workout: workout)
                     }
-                    .padding()
+                    .padding(AppTheme.spacingLG)
+                    .padding(.bottom, 20)
                 }
 
-                // Navigation buttons
                 bottomNavigation
             }
-            .background(Color(.systemGroupedBackground))
+            .background(AppTheme.screenBackground.ignoresSafeArea())
         }
     }
 
@@ -56,51 +58,106 @@ struct WorkoutSessionView: View {
                 navigate(.home)
             } label: {
                 Image(systemName: "xmark")
-                    .font(.body)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle()
+                            .fill(AppTheme.elevatedBackground)
+                    )
             }
-            .buttonStyle(.bordered)
-
-            Text(workoutName)
-                .font(.headline)
-                .lineLimit(1)
 
             Spacer()
+
+            VStack(spacing: 2) {
+                Text(workoutName)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(AppTheme.textPrimary)
+                Text("\(activeSectionIndex + 1) of \(sections.count)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.textTertiary)
+            }
+
+            Spacer()
+
+            Color.clear.frame(width: 36, height: 36)
         }
-        .padding()
-        .background(Color(.systemBackground))
+        .padding(.horizontal, AppTheme.spacingLG)
+        .padding(.vertical, AppTheme.spacingMD)
+        .background(AppTheme.cardBackground)
+    }
+
+    // MARK: - Progress Bar
+
+    private var progressBar: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(AppTheme.elevatedBackground)
+                Rectangle()
+                    .fill(AppTheme.primaryGradient)
+                    .frame(width: geo.size.width * progress)
+                    .animation(.easeInOut(duration: 0.3), value: progress)
+            }
+        }
+        .frame(height: 3)
     }
 
     // MARK: - Section Tabs
 
     private var sectionTabs: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(Array(sections.enumerated()), id: \.offset) { index, section in
-                    Button(section.label) {
-                        withAnimation { activeSectionIndex = index }
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(sections.enumerated()), id: \.offset) { index, section in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                activeSectionIndex = index
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                if index < activeSectionIndex {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 8, weight: .bold))
+                                }
+                                Text(section.label)
+                                    .font(.system(size: 12, weight: activeSectionIndex == index ? .semibold : .medium))
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(activeSectionIndex == index ? AppTheme.focus.opacity(0.12) :
+                                            index < activeSectionIndex ? AppTheme.success.opacity(0.08) :
+                                            AppTheme.elevatedBackground)
+                            )
+                            .foregroundColor(activeSectionIndex == index ? AppTheme.focus :
+                                                index < activeSectionIndex ? AppTheme.success :
+                                                AppTheme.textTertiary)
+                        }
+                        .id(index)
                     }
-                    .font(.caption)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(activeSectionIndex == index ? Color.blue.opacity(0.15) : Color(.systemGray6))
-                    )
-                    .foregroundColor(activeSectionIndex == index ? .blue : .secondary)
+                }
+                .padding(.horizontal, AppTheme.spacingLG)
+                .padding(.vertical, AppTheme.spacingMD)
+            }
+            .background(AppTheme.cardBackground)
+            .onChange(of: activeSectionIndex) { _, newValue in
+                withAnimation {
+                    proxy.scrollTo(newValue, anchor: .center)
                 }
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
         }
-        .background(Color(.systemBackground))
     }
 
-    // MARK: - Section Title
+    // MARK: - Section Header
 
-    private var sectionTitle: some View {
-        Text(sections[safe: activeSectionIndex]?.label ?? "")
-            .font(.title3)
-            .fontWeight(.medium)
+    private var sectionHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(sections[safe: activeSectionIndex]?.label ?? "")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(AppTheme.textPrimary)
+        }
     }
 
     // MARK: - Section Content
@@ -110,32 +167,50 @@ struct WorkoutSessionView: View {
         if let section = sections[safe: activeSectionIndex] {
             switch section.type {
             case .warmup:
-                Text("1 round — no weights needed.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                sectionBadge(icon: "flame.fill", text: "1 round — no weights needed", color: AppTheme.energy)
                 ForEach(workout.warmup) { exercise in
                     WarmupExerciseCard(exercise: exercise)
                 }
 
             case .block(let index):
                 let block = workout.blocks[index]
-                Text("\(block.sets) sets \u{00B7} \(block.superset ? "Superset — 60s rest between rounds" : "Rest 90s between sets")")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                sectionBadge(
+                    icon: block.superset ? "arrow.triangle.2.circlepath" : "timer",
+                    text: "\(block.sets) sets \u{00B7} \(block.superset ? "Superset — 60s rest" : "Rest 90s between sets")",
+                    color: AppTheme.focus
+                )
                 ForEach(block.exercises) { exercise in
                     LoggingExerciseCard(exercise: exercise, reps: block.reps)
                 }
 
             case .accessory(let index):
                 let acc = workout.accessories[index]
-                Text("\(acc.sets) sets \u{00B7} Superset — 45s rest between rounds")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                sectionBadge(
+                    icon: "arrow.triangle.2.circlepath",
+                    text: "\(acc.sets) sets \u{00B7} Superset — 45s rest",
+                    color: AppTheme.recovery
+                )
                 ForEach(acc.exercises) { exercise in
                     LoggingExerciseCard(exercise: exercise, reps: acc.reps)
                 }
             }
         }
+    }
+
+    private func sectionBadge(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(color)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(color.opacity(0.1))
+        )
     }
 
     // MARK: - Bottom Navigation
@@ -144,37 +219,47 @@ struct WorkoutSessionView: View {
         HStack(spacing: 12) {
             if activeSectionIndex > 0 {
                 Button {
-                    withAnimation { activeSectionIndex -= 1 }
+                    withAnimation(.easeInOut(duration: 0.25)) { activeSectionIndex -= 1 }
                 } label: {
-                    Label("Back", systemImage: "chevron.left")
-                        .frame(maxWidth: .infinity)
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Back")
+                    }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(SecondaryButtonStyle())
             }
 
             if activeSectionIndex < sections.count - 1 {
                 Button {
-                    withAnimation { activeSectionIndex += 1 }
+                    withAnimation(.easeInOut(duration: 0.25)) { activeSectionIndex += 1 }
                 } label: {
-                    Label("Next", systemImage: "chevron.right")
-                        .labelStyle(.titleAndIcon)
-                        .frame(maxWidth: .infinity)
+                    HStack(spacing: 4) {
+                        Text("Next")
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(GradientButtonStyle())
             } else {
                 Button {
                     viewModel.completeWorkout(workoutName: workoutName)
                     navigate(.done(workoutName))
                 } label: {
-                    Label("Complete", systemImage: "checkmark")
-                        .frame(maxWidth: .infinity)
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 16))
+                        Text("Complete Workout")
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .buttonStyle(GradientButtonStyle(gradient: AppTheme.successGradient))
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
+        .padding(AppTheme.spacingLG)
+        .background(
+            AppTheme.cardBackground
+                .shadow(color: AppTheme.shadowMedium, radius: 8, x: 0, y: -4)
+        )
     }
 }
 
@@ -192,45 +277,38 @@ struct WarmupExerciseCard: View {
     let exercise: Exercise
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: AppTheme.spacingMD) {
+            Circle()
+                .fill(AppTheme.energy.opacity(0.12))
+                .frame(width: 36, height: 36)
+                .overlay(
+                    Image(systemName: "figure.flexibility")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppTheme.energy)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
                 Text(exercise.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
                 if let reps = exercise.reps {
                     Text(reps)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(AppTheme.textSecondary)
                 }
             }
+
             Spacer()
+
             if let url = exercise.youtubeSearchURL {
                 Link(destination: url) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 8))
-                        Text("YouTube")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(.red)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
-                    )
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.red.opacity(0.7))
                 }
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
-        )
+        .cardStyle()
     }
 }
 
@@ -242,63 +320,90 @@ struct LoggingExerciseCard: View {
     let reps: [Int]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: AppTheme.spacingMD) {
+            // Exercise header
             HStack {
-                Text(exercise.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(exercise.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary)
+                    Text("Target: \(reps.map { String($0) }.joined(separator: ", ")) reps")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppTheme.textTertiary)
+                }
                 Spacer()
                 if let url = exercise.youtubeSearchURL {
                     Link(destination: url) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 8))
-                            Text("YouTube")
-                                .font(.caption2)
-                        }
-                        .foregroundColor(.red)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
-                        )
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.red.opacity(0.7))
                     }
                 }
             }
 
-            ForEach(0..<reps.count, id: \.self) { setIndex in
+            // Set inputs
+            VStack(spacing: 8) {
+                // Column headers
                 HStack(spacing: 8) {
-                    Text("S\(setIndex + 1)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 24)
+                    Text("SET")
+                        .frame(width: 32)
+                    Text("WEIGHT")
+                        .frame(maxWidth: .infinity)
+                    Text("REPS")
+                        .frame(maxWidth: .infinity)
+                }
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundColor(AppTheme.textTertiary)
 
-                    TextField("lb", text: binding(for: "\(exercise.name)__\(setIndex)__weight"))
-                        .keyboardType(.decimalPad)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.caption)
+                ForEach(0..<reps.count, id: \.self) { setIndex in
+                    HStack(spacing: 8) {
+                        Text("\(setIndex + 1)")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundColor(AppTheme.focus)
+                            .frame(width: 32, height: 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: AppTheme.radiusSM)
+                                    .fill(AppTheme.focus.opacity(0.08))
+                            )
 
-                    TextField("\(reps[setIndex]) reps", text: binding(for: "\(exercise.name)__\(setIndex)__reps"))
-                        .keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.caption)
+                        HStack(spacing: 4) {
+                            TextField("0", text: binding(for: "\(exercise.name)__\(setIndex)__weight"))
+                                .keyboardType(.decimalPad)
+                                .font(.system(size: 14, weight: .medium))
+                                .multilineTextAlignment(.center)
+                            Text("lb")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(AppTheme.textTertiary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .padding(.horizontal, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: AppTheme.radiusSM)
+                                .fill(AppTheme.elevatedBackground)
+                        )
+
+                        HStack(spacing: 4) {
+                            TextField("\(reps[setIndex])", text: binding(for: "\(exercise.name)__\(setIndex)__reps"))
+                                .keyboardType(.numberPad)
+                                .font(.system(size: 14, weight: .medium))
+                                .multilineTextAlignment(.center)
+                            Text("reps")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(AppTheme.textTertiary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .padding(.horizontal, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: AppTheme.radiusSM)
+                                .fill(AppTheme.elevatedBackground)
+                        )
+                    }
                 }
             }
-
-            Text("Target: \(reps.map { String($0) }.joined(separator: ", ")) reps")
-                .font(.caption2)
-                .foregroundColor(.secondary)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
-        )
+        .cardStyle()
     }
 
     private func binding(for key: String) -> Binding<String> {

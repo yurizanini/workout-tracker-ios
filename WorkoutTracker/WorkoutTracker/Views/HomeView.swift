@@ -5,80 +5,113 @@ struct HomeView: View {
     let navigate: (AppView) -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: AppTheme.spacingXL) {
                 header
-
-                // Weekly overview
                 weeklyOverview
-
-                // Today's workout card
                 todayCard
-
-                // All workouts list
                 allWorkoutsList
             }
-            .padding()
+            .padding(.horizontal, AppTheme.spacingLG)
+            .padding(.top, AppTheme.spacingSM)
+            .padding(.bottom, 40)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(AppTheme.screenBackground.ignoresSafeArea())
     }
 
     // MARK: - Header
 
     private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("My Workouts")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(AppTheme.textPrimary)
                 Text("Body recomposition program")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(AppTheme.textSecondary)
             }
             Spacer()
-            Button("Edit Schedule") {
+            Button {
                 navigate(.schedule)
+            } label: {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(AppTheme.focus)
+                    .frame(width: 40, height: 40)
+                    .background(
+                        Circle()
+                            .fill(AppTheme.focus.opacity(0.1))
+                    )
             }
-            .font(.caption)
-            .buttonStyle(.bordered)
         }
     }
 
     // MARK: - Weekly Overview
 
     private var weeklyOverview: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<7, id: \.self) { index in
-                let done = viewModel.isDayDone(index)
-                let isToday = index == viewModel.todayDayIndex
-                let workoutDay = viewModel.schedule[index]
-                let isRest = workoutDay == .rest
+        VStack(alignment: .leading, spacing: AppTheme.spacingMD) {
+            Text("THIS WEEK")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(AppTheme.textTertiary)
+                .tracking(0.8)
 
-                VStack(spacing: 4) {
-                    Text(WorkoutViewModel.days[index])
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(done ? .green : isToday ? .blue : .secondary)
+            HStack(spacing: 6) {
+                ForEach(0..<7, id: \.self) { index in
+                    dayCell(index: index)
+                }
+            }
+        }
+        .cardStyle()
+    }
 
-                    Text(done ? "\u{2713}" : isRest ? "—" : abbreviation(for: workoutDay))
-                        .font(.system(size: 9))
-                        .foregroundColor(done ? .green : isToday ? .blue : .secondary)
+    private func dayCell(index: Int) -> some View {
+        let done = viewModel.isDayDone(index)
+        let isToday = index == viewModel.todayDayIndex
+        let workoutDay = viewModel.schedule[index]
+        let isRest = workoutDay == .rest
+        let color = done ? AppTheme.success : isToday ? AppTheme.focus : AppTheme.textTertiary
+
+        return VStack(spacing: 6) {
+            Text(WorkoutViewModel.days[index])
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundColor(color)
+
+            ZStack {
+                Circle()
+                    .fill(done ? AppTheme.success.opacity(0.15) : isToday ? AppTheme.focus.opacity(0.12) : Color.clear)
+                    .frame(width: 32, height: 32)
+
+                if done {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(AppTheme.success)
+                } else if isRest {
+                    Image(systemName: "moon.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(AppTheme.textTertiary)
+                } else {
+                    Text(abbreviation(for: workoutDay))
+                        .font(.system(size: 8, weight: .bold, design: .rounded))
+                        .foregroundColor(isToday ? AppTheme.focus : AppTheme.textTertiary)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(done ? Color.green.opacity(0.1) : isToday ? Color.blue.opacity(0.1) : Color(.systemBackground))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(done ? Color.green.opacity(0.3) : isToday ? Color.blue.opacity(0.3) : Color(.separator).opacity(0.3), lineWidth: 0.5)
-                )
-                .onTapGesture {
-                    if !isRest {
-                        navigate(.workout(workoutDay.rawValue))
-                    }
-                }
+            }
+
+            if isToday {
+                Circle()
+                    .fill(AppTheme.focus)
+                    .frame(width: 4, height: 4)
+            } else {
+                Circle()
+                    .fill(Color.clear)
+                    .frame(width: 4, height: 4)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if !isRest {
+                navigate(.workout(workoutDay.rawValue))
             }
         }
     }
@@ -88,100 +121,139 @@ struct HomeView: View {
     private var todayCard: some View {
         Group {
             if viewModel.todayWorkoutDay != .rest {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Today's workout")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                    Text(viewModel.todayWorkoutDay.rawValue)
-                        .font(.headline)
-                        .foregroundColor(.blue)
-                    Button {
-                        navigate(.workout(viewModel.todayWorkoutDay.rawValue))
-                    } label: {
-                        Text("Start workout \u{2192}")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.blue)
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.blue.opacity(0.08))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.blue.opacity(0.2), lineWidth: 0.5)
-                )
+                todayWorkoutCard
             } else {
+                restDayCard
+            }
+        }
+    }
+
+    private var todayWorkoutCard: some View {
+        VStack(alignment: .leading, spacing: AppTheme.spacingMD) {
+            HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Rest day")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    Text("Recovery is part of the program. See you tomorrow!")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary.opacity(0.7))
+                    Text("TODAY'S WORKOUT")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.8))
+                        .tracking(0.8)
+
+                    Text(viewModel.todayWorkoutDay.rawValue)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Spacer()
+                Image(systemName: WorkoutIcon.icon(for: viewModel.todayWorkoutDay))
+                    .font(.system(size: 36, weight: .light))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+
+            Button {
+                navigate(.workout(viewModel.todayWorkoutDay.rawValue))
+            } label: {
+                HStack {
+                    Text("Start Workout")
+                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(AppTheme.focus)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemBackground))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: AppTheme.radiusMD)
+                        .fill(.white)
                 )
             }
         }
+        .padding(AppTheme.spacingXL)
+        .background(
+            RoundedRectangle(cornerRadius: AppTheme.radiusXL)
+                .fill(AppTheme.primaryGradient)
+                .shadow(color: AppTheme.focus.opacity(0.3), radius: 16, x: 0, y: 8)
+        )
+    }
+
+    private var restDayCard: some View {
+        HStack(spacing: AppTheme.spacingLG) {
+            Image(systemName: "moon.stars.fill")
+                .font(.system(size: 32))
+                .foregroundColor(AppTheme.recovery)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Rest Day")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundColor(AppTheme.textPrimary)
+                Text("Recovery is part of the program. See you tomorrow!")
+                    .font(.subheadline)
+                    .foregroundColor(AppTheme.textSecondary)
+            }
+        }
+        .cardStyle()
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - All Workouts
 
     private var allWorkoutsList: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("All workouts")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: AppTheme.spacingMD) {
+            Text("ALL WORKOUTS")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(AppTheme.textTertiary)
+                .tracking(0.8)
 
             ForEach(WorkoutDatabase.allWorkouts) { workout in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(workout.name)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Text("\(workout.blocks.count) blocks \u{00B7} \(workout.accessories.count) accessory supersets")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Button("Start") {
-                        navigate(.workout(workout.name))
-                    }
-                    .font(.caption)
-                    .buttonStyle(.bordered)
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemBackground))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
-                )
+                workoutRow(workout: workout)
             }
 
             Button {
                 navigate(.progress)
             } label: {
-                Text("View progress \u{2192}")
-                    .frame(maxWidth: .infinity)
+                HStack {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 14))
+                    Text("View Progress")
+                        .font(.subheadline.weight(.medium))
+                }
             }
-            .buttonStyle(.bordered)
-            .padding(.top, 8)
+            .buttonStyle(SecondaryButtonStyle())
+            .padding(.top, AppTheme.spacingSM)
         }
+    }
+
+    private func workoutRow(workout: Workout) -> some View {
+        let day = WorkoutDay(rawValue: workout.name) ?? .rest
+        let color = WorkoutIcon.color(for: day)
+
+        return Button {
+            navigate(.workout(workout.name))
+        } label: {
+            HStack(spacing: AppTheme.spacingMD) {
+                Image(systemName: WorkoutIcon.icon(for: day))
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(color)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: AppTheme.radiusMD)
+                            .fill(color.opacity(0.1))
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(workout.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary)
+                    Text("\(workout.blocks.count) blocks \u{00B7} \(workout.accessories.count) supersets")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.textTertiary)
+            }
+        }
+        .cardStyle()
     }
 
     // MARK: - Helpers
@@ -192,7 +264,7 @@ struct HomeView: View {
         case .upperBody2: return "UB2"
         case .lowerBody1: return "LB1"
         case .lowerBody2: return "LB2"
-        case .rest: return "—"
+        case .rest: return ""
         }
     }
 }

@@ -4,43 +4,72 @@ struct CompletionView: View {
     let workoutName: String
     let navigate: (AppView) -> Void
 
+    @State private var animateCheck = false
+    @State private var animateText = false
+
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: AppTheme.spacingXXL) {
             Spacer()
 
-            Image(systemName: "party.popper.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.orange)
+            // Celebration icon
+            ZStack {
+                Circle()
+                    .fill(AppTheme.success.opacity(0.1))
+                    .frame(width: 120, height: 120)
+                    .scaleEffect(animateCheck ? 1.0 : 0.5)
 
-            Text("Workout complete!")
-                .font(.title2)
-                .fontWeight(.semibold)
+                Circle()
+                    .fill(AppTheme.success.opacity(0.2))
+                    .frame(width: 88, height: 88)
+                    .scaleEffect(animateCheck ? 1.0 : 0.5)
 
-            Text("Great work finishing \(workoutName).")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 56))
+                    .foregroundColor(AppTheme.success)
+                    .scaleEffect(animateCheck ? 1.0 : 0.3)
+            }
+            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: animateCheck)
 
-            HStack(spacing: 12) {
+            // Text
+            VStack(spacing: 8) {
+                Text("Workout Complete!")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(AppTheme.textPrimary)
+
+                Text("Great work finishing \(workoutName).")
+                    .font(.subheadline)
+                    .foregroundColor(AppTheme.textSecondary)
+            }
+            .opacity(animateText ? 1 : 0)
+            .offset(y: animateText ? 0 : 10)
+            .animation(.easeOut(duration: 0.4).delay(0.3), value: animateText)
+
+            Spacer()
+
+            // Buttons
+            VStack(spacing: AppTheme.spacingMD) {
                 Button {
                     navigate(.home)
                 } label: {
-                    Text("Home")
-                        .frame(maxWidth: .infinity)
+                    Text("Back to Home")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(GradientButtonStyle())
 
                 Button {
                     navigate(.progress)
                 } label: {
                     Text("View Progress")
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(SecondaryButtonStyle())
             }
-            .padding(.top, 12)
-
-            Spacer()
+            .opacity(animateText ? 1 : 0)
+            .animation(.easeOut(duration: 0.4).delay(0.5), value: animateText)
         }
-        .padding(32)
+        .padding(AppTheme.spacingXL)
+        .background(AppTheme.screenBackground.ignoresSafeArea())
+        .onAppear {
+            animateCheck = true
+            animateText = true
+        }
     }
 }
