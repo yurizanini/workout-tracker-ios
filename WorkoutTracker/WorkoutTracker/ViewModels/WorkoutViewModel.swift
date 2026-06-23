@@ -6,12 +6,19 @@ class WorkoutViewModel: ObservableObject {
     // MARK: - Published Properties
 
     @Published var schedule: [WorkoutDay] {
-        didSet { saveSchedule() }
+        didSet {
+            saveSchedule()
+            Task { await cloudKit.saveSchedule(schedule) }
+        }
     }
     @Published var logs: [String: [WorkoutLogEntry]] {
         didSet { saveLogs() }
     }
     @Published var currentLogInputs: [String: String] = [:]
+    @Published var isSyncing = false
+    @Published var lastSyncDate: Date?
+
+    private let cloudKit = CloudKitManager.shared
 
     // MARK: - Constants
 
@@ -63,6 +70,31 @@ class WorkoutViewModel: ObservableObject {
     init() {
         self.schedule = Self.loadSchedule()
         self.logs = Self.loadLogs()
+
+        // Sync with CloudKit on launch
+        Task {
+            await syncWithCloud()
+        }
+    }
+
+    // MARK: - CloudKit Sync
+
+    func syncWithCloud() async {
+        isSyncing = true
+        let (remoteSchedule, remoteLogs) = await cloudKit.performFullSync(
+            localSchedule: schedule,
+            localLogs: logs
+        )
+
+        if let remoteSchedule = remoteSchedule {
+            self.schedule = remoteSchedule
+        }
+        if let remoteLogs = remoteLogs {
+            self.logs = remoteLogs
+        }
+
+        isSyncing = false
+        lastSyncDate = Date()
     }
 
     // MARK: - Methods
@@ -114,6 +146,11 @@ class WorkoutViewModel: ObservableObject {
         logs[weekKey] = weekLogs
 
         currentLogInputs = [:]
+
+        // Sync to CloudKit
+        Task {
+            await cloudKit.saveWorkoutLog(entry, weekKey: weekKey)
+        }
     }
 
     func updateSchedule(dayIndex: Int, workout: WorkoutDay) {
@@ -128,7 +165,7 @@ class WorkoutViewModel: ObservableObject {
         schedule = Self.defaultSchedule
     }
 
-    // MARK: - Persistence
+    // MARK: - Local Persistence (offline cache)
 
     private static let scheduleKey = "wt_schedule_v2"
     private static let logsKey = "wt_logs_v2"

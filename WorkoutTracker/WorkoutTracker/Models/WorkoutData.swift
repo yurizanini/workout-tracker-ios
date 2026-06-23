@@ -76,8 +76,8 @@ struct WorkoutLogEntry: Identifiable, Codable, Hashable {
     let date: String
     var exerciseLogs: [ExerciseLog]
 
-    init(workoutName: String, date: String, exerciseLogs: [ExerciseLog] = []) {
-        self.id = UUID()
+    init(id: UUID = UUID(), workoutName: String, date: String, exerciseLogs: [ExerciseLog] = []) {
+        self.id = id
         self.workoutName = workoutName
         self.date = date
         self.exerciseLogs = exerciseLogs

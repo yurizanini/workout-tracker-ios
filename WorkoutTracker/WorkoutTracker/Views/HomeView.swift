@@ -16,6 +16,9 @@ struct HomeView: View {
             .padding(.top, AppTheme.spacingSM)
             .padding(.bottom, 40)
         }
+        .refreshable {
+            await viewModel.syncWithCloud()
+        }
         .background(AppTheme.screenBackground.ignoresSafeArea())
     }
 
@@ -27,9 +30,19 @@ struct HomeView: View {
                 Text("My Workouts")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(AppTheme.textPrimary)
-                Text("Body recomposition program")
-                    .font(.subheadline)
-                    .foregroundColor(AppTheme.textSecondary)
+                HStack(spacing: 6) {
+                    Text("Body recomposition program")
+                        .font(.subheadline)
+                        .foregroundColor(AppTheme.textSecondary)
+                    if viewModel.isSyncing {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                    } else if viewModel.lastSyncDate != nil {
+                        Image(systemName: "icloud.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.success.opacity(0.7))
+                    }
+                }
             }
             Spacer()
             Button {
