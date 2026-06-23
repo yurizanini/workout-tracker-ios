@@ -147,17 +147,17 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("TODAY'S WORKOUT")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(AppTheme.textOnAccentSecondary)
                         .tracking(0.8)
 
                     Text(viewModel.todayWorkoutDay.rawValue)
                         .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(AppTheme.textOnAccent)
                 }
                 Spacer()
                 Image(systemName: WorkoutIcon.icon(for: viewModel.todayWorkoutDay))
                     .font(.system(size: 36, weight: .light))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(AppTheme.textOnAccent.opacity(0.6))
             }
 
             Button {
