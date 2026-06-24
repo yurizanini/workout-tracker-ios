@@ -7,7 +7,6 @@ class CloudKitManager: ObservableObject {
 
     private var container: CKContainer?
     private var privateDB: CKDatabase?
-    private var cloudKitAvailable = false
 
     // Record types
     private let scheduleRecordType = "Schedule"
@@ -16,34 +15,24 @@ class CloudKitManager: ObservableObject {
     // Fixed record ID for the single schedule record
     private let scheduleRecordID = CKRecord.ID(recordName: "user_schedule")
 
+    // Set to true when you have a paid Apple Developer account and have
+    // added the iCloud capability + CloudKit container in Xcode.
+    private let cloudKitEnabled = false
+
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
     @Published var syncError: String?
 
-    private init() {
-        // Defer CloudKit setup — container and privateDB stay nil until
-        // checkAndSetup() confirms iCloud is reachable.
-    }
+    private init() {}
 
-    /// Call once at app launch (from ViewModel.initialSync) to test
-    /// whether iCloud/CloudKit is usable and only then create the container.
     func checkAndSetup() async -> Bool {
-        if cloudKitAvailable { return true }
-
-        // ubiquityIdentityToken is nil when the device has no iCloud
-        // account or the entitlement is missing — safe, never crashes.
-        guard FileManager.default.ubiquityIdentityToken != nil else {
-            print("CloudKit: iCloud not available (no ubiquity token)")
-            return false
-        }
+        guard cloudKitEnabled else { return false }
+        if container != nil { return true }
 
         let ck = CKContainer(identifier: "iCloud.com.yurizanini.WorkoutTracker")
         do {
             let status = try await ck.accountStatus()
-            guard status == .available else {
-                print("CloudKit: account status = \(status)")
-                return false
-            }
+            guard status == .available else { return false }
         } catch {
             print("CloudKit: account status check failed – \(error)")
             return false
@@ -51,7 +40,6 @@ class CloudKitManager: ObservableObject {
 
         self.container = ck
         self.privateDB = ck.privateCloudDatabase
-        self.cloudKitAvailable = true
         return true
     }
 
@@ -179,17 +167,14 @@ class CloudKitManager: ObservableObject {
     // MARK: - Full Sync
 
     func performFullSync(localSchedule: [WorkoutDay], localLogs: [String: [WorkoutLogEntry]]) async -> (schedule: [WorkoutDay]?, logs: [String: [WorkoutLogEntry]]?) {
+        guard await checkAndSetup() else { return (nil, nil) }
+
         isSyncing = true
         syncError = nil
 
         defer {
             isSyncing = false
             lastSyncDate = Date()
-        }
-
-        guard await checkAndSetup() else {
-            syncError = "iCloud not available"
-            return (nil, nil)
         }
 
         let remoteSchedule = await fetchSchedule()
