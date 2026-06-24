@@ -5,8 +5,9 @@ import CloudKit
 class CloudKitManager: ObservableObject {
     static let shared = CloudKitManager()
 
-    private let container: CKContainer
-    private let privateDB: CKDatabase
+    private var container: CKContainer?
+    private var privateDB: CKDatabase?
+    private var cloudKitAvailable = false
 
     // Record types
     private let scheduleRecordType = "Schedule"
@@ -20,34 +21,55 @@ class CloudKitManager: ObservableObject {
     @Published var syncError: String?
 
     private init() {
-        self.container = CKContainer(identifier: "iCloud.com.yurizanini.WorkoutTracker")
-        self.privateDB = container.privateCloudDatabase
+        // Defer CloudKit setup — container and privateDB stay nil until
+        // checkAndSetup() confirms iCloud is reachable.
+    }
+
+    /// Call once at app launch (from ViewModel.initialSync) to test
+    /// whether iCloud/CloudKit is usable and only then create the container.
+    func checkAndSetup() async -> Bool {
+        if cloudKitAvailable { return true }
+
+        // ubiquityIdentityToken is nil when the device has no iCloud
+        // account or the entitlement is missing — safe, never crashes.
+        guard FileManager.default.ubiquityIdentityToken != nil else {
+            print("CloudKit: iCloud not available (no ubiquity token)")
+            return false
+        }
+
+        let ck = CKContainer(identifier: "iCloud.com.yurizanini.WorkoutTracker")
+        do {
+            let status = try await ck.accountStatus()
+            guard status == .available else {
+                print("CloudKit: account status = \(status)")
+                return false
+            }
+        } catch {
+            print("CloudKit: account status check failed – \(error)")
+            return false
+        }
+
+        self.container = ck
+        self.privateDB = ck.privateCloudDatabase
+        self.cloudKitAvailable = true
+        return true
     }
 
     // MARK: - Account Status
 
     func checkAccountStatus() async -> Bool {
-        do {
-            let status = try await container.accountStatus()
-            return status == .available
-        } catch {
-            print("CloudKit account check failed: \(error)")
-            return false
-        }
+        return await checkAndSetup()
     }
 
     // MARK: - Schedule Sync
 
     func saveSchedule(_ schedule: [WorkoutDay]) async {
+        guard let privateDB = privateDB else { return }
         let record = CKRecord(recordType: scheduleRecordType, recordID: scheduleRecordID)
         let rawValues = schedule.map { $0.rawValue }
         record["days"] = rawValues as CKRecordValue
 
         do {
-            let modifier = CKModifyRecordsOperation(recordsToSave: [record])
-            modifier.savePolicy = .changedKeys
-            modifier.qualityOfService = .userInitiated
-
             try await privateDB.modifyRecords(saving: [record], deleting: [], savePolicy: .changedKeys)
         } catch {
             print("CloudKit save schedule error: \(error)")
@@ -56,12 +78,12 @@ class CloudKitManager: ObservableObject {
     }
 
     func fetchSchedule() async -> [WorkoutDay]? {
+        guard let privateDB = privateDB else { return nil }
         do {
             let record = try await privateDB.record(for: scheduleRecordID)
             guard let rawDays = record["days"] as? [String] else { return nil }
             return rawDays.compactMap { WorkoutDay(rawValue: $0) }
         } catch {
-            // Record not found is expected on first use
             print("CloudKit fetch schedule: \(error)")
             return nil
         }
@@ -70,6 +92,7 @@ class CloudKitManager: ObservableObject {
     // MARK: - Workout Logs Sync
 
     func saveWorkoutLog(_ entry: WorkoutLogEntry, weekKey: String) async {
+        guard let privateDB = privateDB else { return }
         let recordID = CKRecord.ID(recordName: "log_\(entry.id.uuidString)")
         let record = CKRecord(recordType: workoutLogRecordType, recordID: recordID)
 
@@ -78,7 +101,6 @@ class CloudKitManager: ObservableObject {
         record["date"] = entry.date as CKRecordValue
         record["weekKey"] = weekKey as CKRecordValue
 
-        // Encode exercise logs as JSON data
         if let data = try? JSONEncoder().encode(entry.exerciseLogs),
            let jsonString = String(data: data, encoding: .utf8) {
             record["exerciseLogsJSON"] = jsonString as CKRecordValue
@@ -93,6 +115,7 @@ class CloudKitManager: ObservableObject {
     }
 
     func fetchAllLogs() async -> [String: [WorkoutLogEntry]]? {
+        guard let privateDB = privateDB else { return nil }
         let query = CKQuery(recordType: workoutLogRecordType, predicate: NSPredicate(value: true))
         query.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
 
@@ -100,12 +123,10 @@ class CloudKitManager: ObservableObject {
             var allRecords: [CKRecord] = []
             var cursor: CKQueryOperation.Cursor? = nil
 
-            // Initial query
             let (results, nextCursor) = try await privateDB.records(matching: query, resultsLimit: 200)
             allRecords.append(contentsOf: results.compactMap { try? $0.1.get() })
             cursor = nextCursor
 
-            // Paginate if needed
             while let activeCursor = cursor {
                 let (moreResults, moreCursor) = try await privateDB.records(continuingMatchFrom: activeCursor, resultsLimit: 200)
                 allRecords.append(contentsOf: moreResults.compactMap { try? $0.1.get() })
@@ -130,11 +151,9 @@ class CloudKitManager: ObservableObject {
                 }
 
                 let entry = WorkoutLogEntry(id: entryID, workoutName: workoutName, date: date, exerciseLogs: exerciseLogs)
-
                 logs[weekKey, default: []].append(entry)
             }
 
-            // Sort entries within each week by date
             for key in logs.keys {
                 logs[key]?.sort { $0.date < $1.date }
             }
@@ -148,6 +167,7 @@ class CloudKitManager: ObservableObject {
     }
 
     func deleteWorkoutLog(entryID: UUID) async {
+        guard let privateDB = privateDB else { return }
         let recordID = CKRecord.ID(recordName: "log_\(entryID.uuidString)")
         do {
             try await privateDB.deleteRecord(withID: recordID)
@@ -167,21 +187,18 @@ class CloudKitManager: ObservableObject {
             lastSyncDate = Date()
         }
 
-        guard await checkAccountStatus() else {
+        guard await checkAndSetup() else {
             syncError = "iCloud not available"
             return (nil, nil)
         }
 
-        // Fetch remote data
         let remoteSchedule = await fetchSchedule()
         let remoteLogs = await fetchAllLogs()
 
-        // Push local schedule if remote is empty
         if remoteSchedule == nil {
             await saveSchedule(localSchedule)
         }
 
-        // Push any local logs that aren't in remote
         if let remoteLogs = remoteLogs {
             for (weekKey, entries) in localLogs {
                 for entry in entries {
@@ -192,7 +209,6 @@ class CloudKitManager: ObservableObject {
                 }
             }
         } else {
-            // Remote is empty, push all local logs
             for (weekKey, entries) in localLogs {
                 for entry in entries {
                     await saveWorkoutLog(entry, weekKey: weekKey)
@@ -200,7 +216,6 @@ class CloudKitManager: ObservableObject {
             }
         }
 
-        // Merge: prefer remote schedule, merge logs (union)
         let finalSchedule = remoteSchedule ?? localSchedule
         var finalLogs = localLogs
         if let remoteLogs = remoteLogs {
