@@ -98,7 +98,7 @@ class CloudKitManager: ObservableObject {
 
         do {
             var allRecords: [CKRecord] = []
-            var cursor: CKQueryResultCursor? = nil
+            var cursor: CKQueryOperation.Cursor? = nil
 
             // Initial query
             let (results, nextCursor) = try await privateDB.records(matching: query, resultsLimit: 200)
